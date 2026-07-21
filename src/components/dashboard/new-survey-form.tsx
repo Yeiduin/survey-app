@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,35 +26,27 @@ export function NewSurveyForm({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
-    const slug = generateSlug(title)
-    
-    const { data, error: insertError } = await supabase
-      .from('surveys')
-      .insert({
-        owner_id: userId,
-        title,
-        slug,
-        description: description || null,
-        settings: {},
-        theme: {},
+    try {
+      const res = await fetch('/api/surveys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description: description || null }),
       })
-      .select()
-      .single()
+      const data = await res.json()
 
-    if (insertError) {
-      setError(insertError.message)
-      setLoading(false)
-      return
+      if (!res.ok) throw new Error(data.error || 'Error al crear encuesta')
+
+      router.push(`/dashboard/surveys/${data.id}/edit`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al crear encuesta')
     }
-
-    router.push(`/dashboard/surveys/${data.id}/edit`)
+    setLoading(false)
   }
 
   return (

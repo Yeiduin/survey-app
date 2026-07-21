@@ -157,12 +157,7 @@ export function BuilderPreview() {
         </Card>
       ))}
 
-      <QuestionTypeSelector pageIndex={activePage}>
-        <Button variant="outline" className="w-full border-dashed gap-2">
-          <span className="text-lg leading-none">+</span>
-          Agregar pregunta
-        </Button>
-      </QuestionTypeSelector>
+      <QuestionTypeSelector pageIndex={activePage} />
     </div>
   )
 }

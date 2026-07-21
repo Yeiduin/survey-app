@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -39,7 +39,6 @@ export function SurveyRunner({ survey, version }: SurveyRunnerProps) {
   const [answers, setAnswers] = useState<Answers>({})
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   const pages = version?.survey_pages?.sort((a: any, b: any) => a.position - b.position) || []
   const flatQuestions = pages.flatMap((page: any) => 
@@ -58,18 +57,31 @@ export function SurveyRunner({ survey, version }: SurveyRunnerProps) {
   const handleSubmit = async () => {
     setLoading(true)
     try {
-      await supabase.from('responses').insert({
-        survey_id: survey.id,
-        survey_version_id: version?.id,
-        status: 'completed',
-        metadata: {
-          user_agent: navigator.userAgent,
-        },
+      // Convert answers to the format the API expects
+      const answerList = Object.entries(answers)
+        .filter(([_, val]) => val !== null && val !== '')
+        .map(([questionId, value]) => ({
+          question_id: questionId,
+          value,
+        }))
+
+      const res = await fetch('/api/responses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          survey_id: survey.id,
+          survey_version_id: version?.id,
+          answers: answerList,
+        }),
       })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al enviar')
+
       setSubmitted(true)
       toast.success('Respuesta enviada correctamente')
-    } catch {
-      toast.error('Error al enviar la respuesta')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al enviar la respuesta')
     } finally {
       setLoading(false)
     }
@@ -110,7 +122,6 @@ export function SurveyRunner({ survey, version }: SurveyRunnerProps) {
 
   const renderQuestion = (question: any) => {
     const value = answers[question.id] ?? getDefaultAnswer(question.type)
-    const hasOptions = ['single_choice', 'multiple_choice', 'dropdown', 'yes_no'].includes(question.type)
 
     return (
       <div key={question.id}>

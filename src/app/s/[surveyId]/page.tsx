@@ -27,12 +27,37 @@ export default async function SurveyPage({
     survey = surveyById
   }
 
-  if (!survey || !['published', 'paused'].includes(survey.status)) {
+  if (!survey) {
     notFound()
   }
 
-  // Get the active version with all its data
-  if (survey.active_version_id) {
+  // Allow owners to preview any status; public only sees published/paused
+  const { data: { user } } = await supabase.auth.getUser()
+  const isOwner = user?.id === survey.owner_id
+
+  if (!['published', 'paused'].includes(survey.status) && !isOwner) {
+    notFound()
+  }
+
+  // Get the active version with all its data (or latest draft for owners)
+  let versionId = survey.active_version_id
+
+  // For draft previews, get the latest unpublished version
+  if (!versionId && isOwner) {
+    const { data: draftVersion } = await supabase
+      .from('survey_versions')
+      .select('id')
+      .eq('survey_id', survey.id)
+      .is('published_at', null)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .single()
+    if (draftVersion) {
+      versionId = draftVersion.id
+    }
+  }
+
+  if (versionId) {
     const { data: version } = await supabase
       .from('survey_versions')
       .select(`
@@ -45,7 +70,7 @@ export default async function SurveyPage({
           )
         )
       `)
-      .eq('id', survey.active_version_id)
+      .eq('id', versionId)
       .single()
 
     return (
@@ -53,6 +78,6 @@ export default async function SurveyPage({
     )
   }
 
-  // No active version - show survey without questions
+  // No version found - show survey without questions
   return <SurveyRunner survey={survey} version={null} />
 }

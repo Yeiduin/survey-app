@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Edit, MoreHorizontal, Trash2, Copy, BarChart3, Eye } from 'lucide-react'
+import { toast } from 'sonner'
 
 const statusLabels: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
   draft: { label: 'Borrador', variant: 'secondary' },
@@ -25,27 +25,31 @@ const statusLabels: Record<string, { label: string; variant: 'default' | 'second
 
 export function SurveyList({ surveys }: { surveys: any[] }) {
   const router = useRouter()
-  const supabase = createClient()
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta encuesta?')) return
-    await supabase.from('surveys').delete().eq('id', id)
-    router.refresh()
+    if (!confirm('¿Estás seguro de eliminar esta encuesta? Esta acción no se puede deshacer.')) return
+    
+    try {
+      const res = await fetch(`/api/surveys/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar')
+      toast.success('Encuesta eliminada')
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar')
+    }
   }
 
   const handleDuplicate = async (survey: any) => {
-    const { title, description, settings, theme } = survey
-    const slug = `${survey.slug}-copy-${Date.now()}`
-    await supabase.from('surveys').insert({
-      owner_id: survey.owner_id,
-      title: `${title} (copia)`,
-      slug,
-      description,
-      settings,
-      theme,
-      status: 'draft',
-    })
-    router.refresh()
+    try {
+      const res = await fetch(`/api/surveys/${survey.id}/duplicate`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al duplicar')
+      toast.success('Encuesta duplicada')
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al duplicar')
+    }
   }
 
   if (surveys.length === 0) {
@@ -107,7 +111,7 @@ export function SurveyList({ surveys }: { surveys: any[] }) {
               <div className="flex items-center justify-between w-full">
                 <Badge variant={status.variant}>{status.label}</Badge>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => window.open(`/s/${survey.slug}`, '_blank')}>
+                  <Button variant="ghost" size="sm" onClick={() => window.open(`/s/${survey.slug || survey.id}`, '_blank')}>
                     <Eye className="h-4 w-4 mr-1" />
                     Vista
                   </Button>

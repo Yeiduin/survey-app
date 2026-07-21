@@ -1,18 +1,9 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { useEditorStore } from '@/stores/survey-editor-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { ArrowLeft, Save, Eye, Globe, Loader2, Undo } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -26,27 +17,32 @@ export function EditorToolbar() {
   const setSaving = useEditorStore((s) => s.setSaving)
   const markClean = useEditorStore((s) => s.markClean)
 
-  const supabase = createClient()
-
   const handleSave = async () => {
     if (!survey) return
     setSaving(true)
 
-    const { error } = await supabase
-      .from('surveys')
-      .update({
-        title: survey.title,
-        description: survey.description,
-        settings: survey.settings,
-        theme: survey.theme,
+    try {
+      const res = await fetch(`/api/surveys/${survey.id}/editor-save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: survey.title,
+          description: survey.description,
+          settings: survey.settings,
+          theme: survey.theme,
+          pages: survey.pages,
+        }),
       })
-      .eq('id', survey.id)
 
-    if (error) {
-      toast.error('Error al guardar')
-    } else {
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error al guardar')
+      }
+
       markClean()
       toast.success('Guardado')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar')
     }
     setSaving(false)
   }
@@ -55,17 +51,40 @@ export function EditorToolbar() {
     if (!survey) return
     setSaving(true)
 
-    const { error } = await supabase
-      .from('surveys')
-      .update({ status: 'published' })
-      .eq('id', survey.id)
+    try {
+      // First save the editor state
+      const saveRes = await fetch(`/api/surveys/${survey.id}/editor-save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: survey.title,
+          description: survey.description,
+          settings: survey.settings,
+          theme: survey.theme,
+          pages: survey.pages,
+        }),
+      })
 
-    if (error) {
-      toast.error('Error al publicar')
-    } else {
+      if (!saveRes.ok) {
+        const data = await saveRes.json()
+        throw new Error(data.error || 'Error al guardar antes de publicar')
+      }
+
+      // Then publish
+      const publishRes = await fetch(`/api/surveys/${survey.id}/publish`, {
+        method: 'POST',
+      })
+
+      if (!publishRes.ok) {
+        const data = await publishRes.json()
+        throw new Error(data.error || 'Error al publicar')
+      }
+
       markClean()
       toast.success('Encuesta publicada')
       router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al publicar')
     }
     setSaving(false)
   }
@@ -104,12 +123,10 @@ export function EditorToolbar() {
             Publicar
           </Button>
         )}
-        <Link href={`/s/${survey.id}`}>
-          <Button variant="ghost" size="sm">
-            <Eye className="h-4 w-4 mr-1" />
-            Vista previa
-          </Button>
-        </Link>
+        <Button variant="ghost" size="sm" onClick={() => window.open(`/s/${survey.id}`, '_blank')}>
+          <Eye className="h-4 w-4 mr-1" />
+          Vista previa
+        </Button>
       </div>
     </div>
   )

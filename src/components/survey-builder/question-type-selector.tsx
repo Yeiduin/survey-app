@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useEditorStore } from '@/stores/survey-editor-store'
-import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -68,10 +67,8 @@ const categories = ['Texto', 'Selección', 'Valoración', 'Fecha', 'Información
 
 export default function QuestionTypeSelector({
   pageIndex,
-  children,
 }: {
   pageIndex: number
-  children?: React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const addQuestion = useEditorStore((s) => s.addQuestion)
@@ -83,13 +80,9 @@ export default function QuestionTypeSelector({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        {children || (
-          <Button variant="outline" className="w-full gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar pregunta
-          </Button>
-        )}
+      <DialogTrigger className="group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background text-sm font-medium whitespace-nowrap transition-all outline-none select-none hover:bg-muted hover:text-foreground w-full gap-2 h-9 px-2.5 cursor-pointer">
+        <Plus className="h-4 w-4" />
+        Agregar pregunta
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>

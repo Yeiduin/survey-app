@@ -22,10 +22,20 @@ export default async function DashboardPage() {
     .eq('owner_id', user.id)
     .eq('status', 'published')
 
-  const { count: totalResponses } = await supabase
-    .from('responses')
-    .select('*', { count: 'exact', head: true })
-    .eq('survey_id', user.id)
+  const { data: userSurveyIds } = await supabase
+    .from('surveys')
+    .select('id')
+    .eq('owner_id', user.id)
+
+  const surveyIdList = userSurveyIds?.map(s => s.id) || []
+  let totalResponses = 0
+  if (surveyIdList.length > 0) {
+    const { count } = await supabase
+      .from('responses')
+      .select('*', { count: 'exact', head: true })
+      .in('survey_id', surveyIdList)
+    totalResponses = count || 0
+  }
 
   return (
     <div className="space-y-6">
